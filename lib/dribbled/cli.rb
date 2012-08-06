@@ -212,12 +212,12 @@ module Dribbled
         when :nagios
           case @action_options[:mode]
             when :active
-              puts "#{plugin_status}:#{plugin_output}"
+              puts "#{plugin_status.to_s.capitalize}:#{plugin_output}"
               exit SendNsca::STATUS[plugin_status]
             when :passive
               sn = SendNsca.new @action_options
               begin
-                sn.send plugin_status , plugin_output
+                sn.send plugin_status, plugin_output
               rescue SendNsca::SendNscaError => e
                 output_message "send_nsca failed: #{e.message}", 1
               end
