@@ -194,7 +194,7 @@ module Dribbled
         unless po_cstate.gsub('cs:','').empty? and po_dstate.gsub('ds:','').empty?
           if ['SyncSource','SyncTarget','VerifyS','VerifyT','PausedSyncS','PausedSyncT','StandAlone'].include? res.cstate
             plugin_status = :warning
-            plugin_output += res.percent.nil? ? " #{res.id}:#{po_cstate};#{po_dstate}" : " #{res.id}:#{po_cstate}[#{res.percent}%%];#{po_dstate}"
+            plugin_output += res.percent.nil? ? " #{res.id}:#{po_cstate};#{po_dstate}" : " #{res.id}:#{po_cstate}[#{res.percent}%];#{po_dstate}"
           elsif not res.in_configuration?
             plugin_status = :warning
             plugin_output += " #{res.id}[unconfigured]>#{po_cstate}/;#{po_dstate}"
