@@ -196,7 +196,7 @@ module Dribbled
             plugin_status = :warning
             plugin_output += res.percent.nil? ? " #{res.id}:#{po_cstate};#{po_dstate}" : " #{res.id}:#{po_cstate}[#{res.percent}%];#{po_dstate}"
           elsif not res.in_configuration?
-            plugin_status = :warning
+            plugin_status = :ok
             plugin_output += " #{res.id}[unconfigured]>#{po_cstate}/;#{po_dstate}"
           else
             plugin_output += " #{res.id}>#{po_cstate};#{po_dstate}"
@@ -212,7 +212,7 @@ module Dribbled
         when :nagios
           case @action_options[:mode]
             when :active
-              puts "#{plugin_status.to_s.capitalize}:#{plugin_output}"
+              puts "#{plugin_status.to_s.upcase}:#{plugin_output}"
               exit SendNsca::STATUS[plugin_status]
             when :passive
               sn = SendNsca.new @action_options
