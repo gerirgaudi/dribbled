@@ -11,7 +11,8 @@ module Dribbled
     PROCDRBD_VERSION_RE = /^version:\s+(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)\s+\(api:(?<api>\d+)\/proto:(?<proto>[0-9-]+)/
     PROCDRBD_RESOURCE_RE = /^\s*(?<id>\d+):\s+cs:(?<cstate>[\w\/]+)\s+(st|ro):(?<state>[\w\/]+)\s+ds:(?<dstate>[\w\/]+)\s+/
     PROCDRBD_URESOURCE_RE = /^\s*(?<id>\d+):\s+cs:(?<cstate>[\w\/]+)/
-    PROCDRBD_ACTIVITY_RE = /^\s+\[[.>=]+\]\s+(?<activity>[a-z']+):\s+(?<percent>[0-9.]+)%/
+    PROCDRBD_ACTIVITY_RE = /^\s+\[[.>=]+\]\s+(?<activity>[a-z']+):\s+(?<percent>[0-9.]+)%\s+\(\d+\/\d+\)M(finish:\s+(?<finish>[0-9:]+)\s+)*/
+    PROCDRBD_ACTIVITY_STATUS_RE = /^\s+finish:\s+(?<finish>[0-9:]+)\s+/
 
     def initialize(options)
       @log = options[:log].nil? ? nil : options[:log]
@@ -63,6 +64,10 @@ module Dribbled
             m = PROCDRBD_ACTIVITY_RE.match(line)
             resources_run[r].activity = m[:activity].gsub(/'/,"").to_sym
             resources_run[r].percent = m[:percent].to_f
+            resources_run[r].finish = m[:finish]
+          elsif PROCDRBD_ACTIVITY_STATUS_RE.match(line)
+            m = PROCDRBD_ACTIVITY_STATUS_RE.match(line)
+            resources_run[r].finish = m[:finish]
           elsif PROCDRBD_VERSION_RE.match(line)
             @version_major = $1
             @version_minor = $2
@@ -133,7 +138,7 @@ module Dribbled
   class DrbdResource
 
     attr_reader :id
-    attr_accessor :name, :cstate, :dstate, :state, :config, :primary, :secondary, :activity, :percent, :in_kernel, :in_configuration
+    attr_accessor :name, :cstate, :dstate, :state, :config, :primary, :secondary, :activity, :percent, :finish, :in_kernel, :in_configuration
 
     def initialize(res,hostname)
       @id = res
@@ -144,6 +149,7 @@ module Dribbled
       @state = nil
       @activity = nil
       @percent = nil
+      @finish = nil
       @primary = { :hostname => nil, :disk => nil, :device => nil }
       @secondary = { :hostname => nil, :disk => nil, :device => nil }
       @in_kernel = false
@@ -170,9 +176,9 @@ module Dribbled
         h2 = ph; dev2 = @primary[:device]
       end
 
-      percent = @activity.nil? ? nil : "[%3d%%]" % @percent
+      percent_finish = @activity.nil? ? nil : "[%3d%% %8s]" % [@percent,@finish]
 
-      "%2d %6s %-13s %6s %-22s %-20s %10s %-11s %10s %-11s" % [@id,@name,@cstate,percent,@dstate,@state,h1,dev1,h2,dev2]
+      "%2d %6s %-13s %15s %-22s %-20s %10s %-11s %10s %-11s" % [@id,@name,@cstate,percent_finish,@dstate,@state,h1,dev1,h2,dev2]
     end
 
     def inspect
