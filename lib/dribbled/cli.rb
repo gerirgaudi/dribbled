@@ -196,7 +196,7 @@ module Dribbled
             plugin_status = :warning
             plugin_output += res.percent.nil? ? " #{res.id}:#{po_cstate};#{po_dstate}" : " #{res.id}:#{po_cstate}[#{res.percent}%,#{res.finish}];#{po_dstate}"
           elsif not res.in_configuration?
-            plugin_status = :ok
+            plugin_status = :warning
             plugin_output += " #{res.id}[unconfigured]>#{po_cstate}/;#{po_dstate}"
           else
             plugin_output += " #{res.id}>#{po_cstate};#{po_dstate}"
