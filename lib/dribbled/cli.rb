@@ -11,7 +11,7 @@ module Dribbled
 
     include Senedsa
 
-    COMMANDS = %w(show check snap)
+    COMMANDS = %w(show check snap watch)
     COMPONENTS = %w(resources)
     DEFAULT_CONFIG_FILE = File.join(ENV['HOME'],"/.senedsa/config")
 
@@ -21,6 +21,7 @@ module Dribbled
 
       @global_options = { :debug => false, :drbdadm => 'drbdadm', :xmldump => nil, :procdrbd => '/proc/drbd', :hostname => nil }
       @action_options = { :monitor => :nagios, :mode => :active, :suffix => nil, :directory => '/tmp' }
+      @action_arguments = {}
       @action = nil
     end
 
@@ -56,43 +57,54 @@ module Dribbled
       opts.banner = "Usage: #{ID} [options] <action> [options]"
       opts.separator ""
       opts.separator "Actions:"
-      opts.separator "    show                             Displays component information"
+      opts.separator "    show                             Displays resource information"
+      opts.separator "    watch                            Displays resource information at a given interval"
       opts.separator "    check                            Performs health checks"
       opts.separator "    snap                             Saves contents of /proc/drbd and 'drbdadm dump-xml'"
       opts.separator ""
       opts.separator "General options:"
-      opts.on('-D', '--drbdadm DRBDADM',                String,              "Path to drbdadm binary")                             { |drbdadm| @global_options[:drbdadm] = drbdadm }
-      opts.on('-P', '--procdrbd PROCDRBD',              String,              "Path to /proc/drbd")                                 { |procdrbd| @global_options[:procdrbd] = procdrbd }
-      opts.on('-X', '--xmldump XMLDUMP',                String,              "Path to output for drbdadm --dump-xml")              { |xmldump| @global_options[:xmldump] = xmldump}
-      opts.on('-H', '--hostname HOSTNAME',              String,              "Hostname")                                           { |hostname| @global_options[:hostname] = hostname }
-      opts.on('-d', '--debug',                                               "Enable debug mode")                                  { @global_options[:debug] = true}
-      opts.on('-a', '--about',                                               "Display #{ID} information")                          { output_message ABOUT, 0 }
-      opts.on('-V', '--version',                                             "Display #{ID} version")                              { output_message VERSION, 0 }
-      opts.on_tail('--help',                                                 "Show this message")                                  { @global_options[:HELP] = true }
+      opts.on('-D', '--drbdadm DRBDADM',                String,              "Path to drbdadm binary")                     { |drbdadm| @global_options[:drbdadm] = drbdadm }
+      opts.on('-P', '--procdrbd PROCDRBD',              String,              "Path to /proc/drbd")                         { |procdrbd| @global_options[:procdrbd] = procdrbd }
+      opts.on('-X', '--xmldump XMLDUMP',                String,              "Path to output for drbdadm --dump-xml")      { |xmldump| @global_options[:xmldump] = xmldump}
+      opts.on('-H', '--hostname HOSTNAME',              String,              "Hostname")                                   { |hostname| @global_options[:hostname] = hostname }
+      opts.on('-d', '--debug',                                               "Enable debug mode")                          { @global_options[:debug] = true}
+      opts.on('-a', '--about',                                               "Display #{ID} information")                  { output_message ABOUT, 0 }
+      opts.on('-V', '--version',                                             "Display #{ID} version")                      { output_message VERSION, 0 }
+      opts.on_tail('--help',                                                 "Show this message")                          { @global_options[:HELP] = true }
 
       actions = {
           :show => OptionParser.new do |aopts|
-            aopts.banner = "Usage: #{ID} [options] show <component>"
-            aopts.separator ""
-            aopts.separator "      <component> is resources|res"
+            aopts.banner = "Usage: #{ID} [options] show [resource]"
           end,
           :check => OptionParser.new do |aopts|
             aopts.banner = "Usage: #{ID} [options] check [check_options]"
             aopts.separator ""
             aopts.separator "Check Options"
-            aopts.on('-M', '--monitor [nagios]',            [:nagios],            "Monitoring system")                                 { |monitor|        @action_options[:monitor] = monitor }
-            aopts.on('-m', '--mode [active|passive]',       [:active, :passive],  "Monitoring mode")                                   { |mode|           @action_options[:mode] = mode }
-            aopts.on('-H', '--nsca_hostname HOSTNAME',      String,               "NSCA hostname to send passive checks")              { |nsca_hostname|  @action_options[:nsca_hostname] = nsca_hostname }
-            aopts.on('-c', '--config CONFIG',               String,               "Path to Senedsa (send_nsca) configuration" )        { |config|         @action_options[:senedsa_config] = config }
-            aopts.on('-S', '--svc_descr SVC_DESR',          String,               "Nagios service description")                        { |svc_descr|      @action_options[:svc_descr] = svc_descr }
-            aopts.on('-h', '--hostname HOSTNAME',           String,               "Service hostname")                                  { |hostname|       @action_options[:svc_hostname] = hostname }
+            aopts.on('-M', '--monitor [nagios]',       [:nagios],            "Monitoring system")                          { |monitor|       @action_options[:monitor] = monitor }
+            aopts.on('-m', '--mode [active|passive]',  [:active, :passive],  "Monitoring mode")                            { |mode|          @action_options[:mode] = mode }
+            aopts.on('-H', '--nsca_hostname HOSTNAME', String,               "NSCA hostname to send passive checks")       { |nsca_hostname| @action_options[:nsca_hostname] = nsca_hostname }
+            aopts.on('-c', '--config CONFIG',          String,               "Path to Senedsa (send_nsca) configuration" ) { |config|        @action_options[:senedsa_config] = config }
+            aopts.on('-S', '--svc_descr SVC_DESR',     String,               "Nagios service description")                 { |svc_descr|     @action_options[:svc_descr] = svc_descr }
+            aopts.on('-h', '--hostname HOSTNAME',      String,               "Service hostname")                           { |hostname|      @action_options[:svc_hostname] = hostname }
           end,
           :snap => OptionParser.new do |aopts|
             aopts.banner = "Usage: #{ID} [options] snap [snap_options]"
             aopts.separator ""
             aopts.separator "Snap Options"
-            aopts.on('-S','--suffix SUFFIX',                String,               "Suffix (defaults to PID)")                          { |suffix|            @action_options[:suffix] = suffix }
-            aopts.on('-D', '--directory DIRECTORY',         String,               "Directory (defaults to /tmp)")                      { |directory|         @action_options[:directory] = directory }
+            aopts.on('-S','--suffix SUFFIX',           String,               "Suffix (defaults to PID)")                   { |suffix|        @action_options[:suffix] = suffix }
+            aopts.on('-D','--directory DIRECTORY',     String,               "Directory (defaults to /tmp)")               { |directory|     @action_options[:directory] = directory }
+          end,
+          :watch => OptionParser.new do |aopts|
+            aopts.banner = "Usage: #{ID} [options] watch [watch_options] interval [count]"
+            aopts.separator ""
+            aopts.separator "Watch Arguments"
+            aopts.separator "  interval: amount of time in seconds between each report (default: 60)"
+            aopts.separator "  count: number of reports to produce"
+            aopts.separator ""
+            aopts.separator "Watch Options"
+            aopts.on('-r', '--resource RESOURCE',      String,               "Resource")                                   { |resource|      @action_options[:resource] = resource }
+            aopts.on('-c', '--cstate CSTATE_RE',       String,               "CState (partial match)")                     { |cstate|        @action_options[:cstate] = cstate }
+            aopts.on('-d', '--dstate DSTATE_RE',       String,               "DState (partial match)")                     { |dstate|        @action_options[:dstate] = dstate }
           end
       }
 
@@ -102,6 +114,13 @@ module Dribbled
       @action = @whoami == :check_drbd ? :check : @arguments.shift.to_sym
       raise OptionParser::InvalidArgument, "invalid action #@action" if actions[@action].nil?
       actions[@action].order!(@arguments)
+      case @action
+        when :show
+          @action_arguments[:component] = @arguments.shift
+        when :watch
+          @action_arguments[:interval] = @arguments.shift
+          @action_arguments[:count] = @arguments.shift
+      end
     end
 
     def config_options?
@@ -131,10 +150,23 @@ module Dribbled
     end
 
     def process_options
+      case @action
+        when :watch
+          if @action_options[:resource].nil? and @action_options[:cstate].nil? and @action_options[:dstate].nil?
+            @action_options[:cstate] = 'Sync'
+            @action_options[:dstate] = 'Inconsistent'
+          else
+            @action_options[:cstate] = '__NOMATCH__' if @action_options[:cstate].nil?
+            @action_options[:dstate] = '__NOMATCH__' if @action_options[:dstate].nil?
+          end
+      end
       true
     end
 
     def process_arguments
+      @action_arguments[:interval] = 60 if @action_arguments[:interval].nil?
+      @action_arguments[:interval] = @action_arguments[:interval].to_i
+      @action_arguments[:count] = @action_arguments[:count].nil? ? -1 : @action_arguments[:count].to_i
       true
     end
 
@@ -146,21 +178,21 @@ module Dribbled
         when :show then run_show
         when :check then run_check
         when :snap then run_snap
+        when :watch then run_watch
       end
 
     end
 
     def run_show
-      #raise ArgumentError, "missing component" if @arguments.size == 0
-      component = 'res'
 
-      case component
-        when 'resource', 'res'
-          @drbdset.each do |r,resource|
-            puts resource.to_s
-          end
+      case @action_arguments[:component]
         when 'version'
           puts @drbdset.version
+        else
+          resource_name_re = @action_arguments[:component].nil? ? /.*/ : /^#{@action_arguments[:component]}$/
+          @drbdset.each do |r,resource|
+            puts resource.to_s if resource.name =~ resource_name_re
+          end
       end
     end
 
@@ -231,6 +263,25 @@ module Dribbled
       xmldump_file = "#{@action_options[:directory]}/xmldump.#{@action_options[:suffix]}"
       File.open(procdrbd_file, 'w') {|f| f.write(@drbdset.resources_run_raw) }
       File.open(xmldump_file, 'w') {|f| f.write(@drbdset.resources_cfg_raw) }
+    end
+
+    def run_watch
+      begin
+        count = @action_arguments[:count]
+        loop do
+          @drbdset = DrbdSet.new @global_options
+          @drbdset.each do |r,resource|
+            if resource.cstate =~ /#{@action_options[:cstate]}/ or resource.dstate =~ /#{@action_options[:dstate]}/ or resource.name == @action_options[:resource]
+              puts resource
+            end
+          end
+          count -= 1
+          break if count == 0
+          sleep(@action_arguments[:interval])
+        end
+      rescue Interrupt => e
+        exit 0
+      end
     end
 
     def output_message(message, exitstatus=nil)
