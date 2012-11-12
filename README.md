@@ -6,11 +6,11 @@
 
 # SYNOPSIS
 
-    dribbled [options] <action> [options]
+    dribbled [options] <action> [action_options] [action_arguments]
     
-Actions are one of `show`, `check`, `snap`.
+Actions are one of `show`, `check`, `watch` and `snap`.
 
-Options are as follows:
+General options are as follows:
 
 	General options:
         -D, --drbdadm DRBDADM            Path to drbdadm binary
@@ -32,13 +32,56 @@ With no options or arguments, `dribbled` displays help as shown above (unless ca
 
 ## Show
 
-The `show` action displays information about DRBD devices in the system. This action currently accepts no options.
+The `show` action displays information about DRBD devices in the system. This action accepts one optional argument and no options. With no arguments, it shows information about all known resources (runtime and configured):
 
       gerir@boxie:~:dribbled show
       0     r0 Connected         UpToDate/UpToDate      Secondary/Primary   sourcehost /dev/drbd0   desthost /dev/drbd0
       1     r1 Connected         UpToDate/UpToDate      Secondary/Primary   sourcehost /dev/drbd1   desthost /dev/drbd1
       5     r5 Connected         UpToDate/UpToDate      Secondary/Primary   sourcehost /dev/drbd5   desthost /dev/drbd5
       6     r6 SyncTarget [  4%] Inconsistent/UpToDate  Secondary/Primary   sourcehost /dev/drbd6   desthost /dev/drbd6
+
+Arguments can be either a resource name or the word `version`. In the first case, it will display information about the resource specified:
+
+      gerir@boxie:~:dribbled show r0
+      0     r0 Connected         UpToDate/UpToDate      Secondary/Primary   sourcehost /dev/drbd0   desthost /dev/drbd0
+      
+Note that the information provided about a resource is augmented with progress and estimated time to completion when the connection state is one of `SyncSource`, `SyncTarget`, `VerifyS` or `VerifyT`. The examples shown in this document only show percentages for brevity.
+
+In the second case, it will show the DRBD version in use:
+
+      gerir@boxie:~:dribbled version
+      8.0.14
+
+## Watch
+
+It is sometimes useful to watch a given resources as it changes over time, for instance, as it is initialized or verified. One way to do this is running `watch -d -t -n 15 ‘dribbled show | grep Sync’`. *Dribbled* can do this by itself.
+
+      Watch Arguments
+         interval: amount of time in seconds between each report (default: 60)
+         count: number of reports to produce
+
+       Watch Options
+          -r, --resource RESOURCE          Resource
+          -c, --cstate CSTATE_RE           CState (partial match)
+          -d, --dstate DSTATE_RE           DState (partial match)
+
+In its simplest form:
+
+      gerir@boxie:~:dribbled watch 15
+      6     r6 SyncTarget [  4%] Inconsistent/UpToDate  Secondary/Primary   sourcehost /dev/drbd6   desthost /dev/drbd6
+      6     r6 SyncTarget [  6%] Inconsistent/UpToDate  Secondary/Primary   sourcehost /dev/drbd6   desthost /dev/drbd6
+      6     r6 SyncTarget [  8%] Inconsistent/UpToDate  Secondary/Primary   sourcehost /dev/drbd6   desthost /dev/drbd6
+      6     r6 SyncTarget [ 10%] Inconsistent/UpToDate  Secondary/Primary   sourcehost /dev/drbd6   desthost /dev/drbd6
+
+By default, `dribbled` will match resources where the connection state is `Sync` and the disk state is `Inconsistent` (as regular expressions). To watch resources being verified:
+
+      gerir@boxie:~:dribbled watch -c Verify 15
+      6     r6 VerifyS     [  8%] UpToDate/UpToDate    Secondary/Primary   sourcehost /dev/drbd6   desthost /dev/drbd6
+      6     r6 VerifyS     [ 10%] UpToDate/UpToDate    Secondary/Primary   sourcehost /dev/drbd6   desthost /dev/drbd6
+      6     r6 VerifyS     [ 13%] UpToDate/UpToDate    Secondary/Primary   sourcehost /dev/drbd6   desthost /dev/drbd6
+      6     r6 VerifyS     [ 15%] UpToDate/UpToDate    Secondary/Primary   sourcehost /dev/drbd6   desthost /dev/drbd6
+
+The interval is specified in seconds, and defaults to 60. An optional second argument can be provided and specifies a count of iterations.
 
 ## Check
 
